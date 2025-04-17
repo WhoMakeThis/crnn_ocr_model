@@ -1,6 +1,7 @@
 import os
 import random
 import string
+import platform
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from tqdm import tqdm
 
@@ -10,7 +11,20 @@ CAPTCHA_LENGTH = 5
 CHARS = string.ascii_uppercase + string.digits
 SPLIT_RATIOS = {"train": 0.8, "val": 0.1, "test": 0.1}
 
-FONT_PATH = "C:/Windows/Fonts/arial.ttf"  # 시스템에 있는 폰트로 변경 가능
+# 운영체제에 맞는 기본 경로 설정
+if platform.system() == "Windows":
+    FONT_PATH = "C:/Users/ADMIN/AppData/Local/Microsoft/Windows/Fonts/dejavu-sans.bold_0.ttf"  # Windows 사용자 폰트 경로
+elif platform.system() == "Linux":
+    FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+elif platform.system() == "Darwin":  # macOS
+    FONT_PATH = "/usr/local/share/fonts/DejaVuSans-Bold.ttf"  # 직접 설치한 경우 경로 예시
+else:
+    FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+# 폰트 존재 여부 확인
+if not os.path.exists(FONT_PATH):
+    raise FileNotFoundError(f"Font file not found at: {FONT_PATH}")
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "captcha_images_split")
 IMAGE_SIZE = (180, 60)
