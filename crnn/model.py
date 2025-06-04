@@ -17,7 +17,7 @@ class CRNN(nn.Module):
 
         # RNN expects input of shape (batch, sequence_len=W, features=128*H/4)
         self.rnn = nn.LSTM(
-            input_size=128 * (imgH // 4),  # 128 * H'
+            input_size=128 * (imgH // 4),  # 128 * 12 = 1536
             hidden_size=nh,
             num_layers=2,
             bidirectional=True,
@@ -31,8 +31,8 @@ class CRNN(nn.Module):
         conv = self.cnn(x)  # -> (B, C, H', W')
         b, c, h, w = conv.size()
 
-        # assert to catch CNN height issue
-        assert h == 8, f"Expected height=8 after conv, got {h}"
+        # ✅ 수정된 높이 체크
+        assert h == 12, f"Expected height=12 after conv, got {h}"
 
         # prepare for RNN: (B, W, C*H)
         conv = conv.permute(0, 3, 1, 2)       # (B, W, C, H)

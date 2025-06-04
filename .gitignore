@@ -9,7 +9,7 @@ __pycache__/
 dataset/captcha_images_split/
 .vscode/
 .idea
+
 best_crnn_model.pth
-crnn_prediction_1K.csv
-crnn_prediction_10K.csv
-crnn_prediction_50K.csv
+*.csv
+DejaVuSans-Bold.ttf

@@ -5,15 +5,20 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from tqdm import tqdm
 
 # ---------- 설정 ----------
-TOTAL_IMAGES = 50000  # 생성할 총 이미지 수
+TOTAL_IMAGES = 50000
 CAPTCHA_LENGTH = 5
 CHARS = string.ascii_uppercase + string.digits
 SPLIT_RATIOS = {"train": 0.8, "val": 0.1, "test": 0.1}
 
-FONT_PATH = "C:/Windows/Fonts/arial.ttf"  # 시스템에 있는 폰트로 변경 가능
+# ✅ Flask에서 사용한 폰트로 통일
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_PATH = os.path.join(SCRIPT_DIR, "DejaVuSans-Bold.ttf")
+
+# ✅ Flask에서 사용하는 CAPTCHA 이미지 크기와 동일하게
+IMAGE_SIZE = (150, 50)
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "captcha_images_split")
-IMAGE_SIZE = (180, 60)
 
 # ---------- CAPTCHA 이미지 생성 ----------
 def generate_random_text(length=CAPTCHA_LENGTH):
@@ -51,9 +56,8 @@ def create_captcha_image(text):
         color = tuple(random.randint(0, 255) for _ in range(3))
         draw.point((x_dot, y_dot), fill=color)
 
-    # 블러
+    # 블러 처리
     img = img.filter(ImageFilter.GaussianBlur(radius=1))
-
     return img
 
 # ---------- 메인 ----------
@@ -62,10 +66,9 @@ if __name__ == "__main__":
 
     # 폴더 생성
     for split in SPLIT_RATIOS:
-        split_path = os.path.join(OUTPUT_DIR, split)
-        os.makedirs(split_path, exist_ok=True)
+        os.makedirs(os.path.join(OUTPUT_DIR, split), exist_ok=True)
 
-    # 이미지 생성
+    # 랜덤 텍스트 생성 및 셔플
     all_texts = [generate_random_text() for _ in range(TOTAL_IMAGES)]
     random.shuffle(all_texts)
 

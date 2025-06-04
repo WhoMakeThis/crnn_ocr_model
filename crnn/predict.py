@@ -15,10 +15,10 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 IDX2CHAR = {idx + 1: char for idx, char in enumerate(CHARS)}
 IDX2CHAR[0] = ""  # CTC blank
 
-# 전처리
+# ✅ 전처리 - 학습 이미지 크기와 동일하게
 transform = transforms.Compose([
     transforms.Grayscale(num_output_channels=1),
-    transforms.Resize((32, 128)),
+    transforms.Resize((50, 150)),  # 변경됨
     transforms.ToTensor()
 ])
 
@@ -45,8 +45,8 @@ def char_accuracy(pred, truth):
 def calc_similarity(pred, truth):
     return SequenceMatcher(None, pred, truth).ratio()
 
-# 모델 로드
-model = CRNN(32, 1, len(CHARS) + 1, 256).to(DEVICE)
+# ✅ 모델 로드 - height=50로 맞춤
+model = CRNN(50, 1, len(CHARS) + 1, 256).to(DEVICE)
 model.load_state_dict(torch.load("best_crnn_model.pth", map_location=DEVICE))
 model.eval()
 
@@ -69,7 +69,7 @@ for img_path in tqdm(image_paths, desc="Predicting"):
         pred_text = decode_prediction(preds)
 
     filename = os.path.basename(img_path)
-    ground_truth = os.path.splitext(filename)[0]  # ✅ .lower() 제거
+    ground_truth = os.path.splitext(filename)[0]
     is_correct = (pred_text == ground_truth)
     acc = round(char_accuracy(pred_text, ground_truth), 3)
     similarity = round(calc_similarity(pred_text, ground_truth), 3)

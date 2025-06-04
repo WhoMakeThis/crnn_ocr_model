@@ -26,7 +26,7 @@ class CaptchaDataset(Dataset):
         ])
         self.transform = transforms.Compose([
             transforms.Grayscale(num_output_channels=1),
-            transforms.Resize((32, 128)),
+            transforms.Resize((50, 150)),  # ✅ 여기만 수정됨
             transforms.ToTensor()
         ])
 
