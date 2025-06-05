@@ -1,45 +1,80 @@
+import os
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
+from dataset import CaptchaDataset, CHARS, collate_fn
+from model import CRNN
+from tqdm import tqdm
 
-class CRNN(nn.Module):
-    def __init__(self, imgH, nc, nclass, nh):
-        super(CRNN, self).__init__()
-        # CNN backbone
-        self.cnn = nn.Sequential(
-            nn.Conv2d(nc, 64, kernel_size=3, stride=1, padding=1),  # (B, 64, H, W)
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),  # -> (B, 64, H/2, W/2)
+# 하이퍼파라미터
+BATCH_SIZE = 16
+EPOCHS = 30
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+SAVE_PATH = "best_crnn_model.pth"
+criterion = nn.CTCLoss(blank=0, zero_infinity=True)
 
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),  # (B, 128, H/2, W/2)
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),  # -> (B, 128, H/4, W/4)
-        )
+def train():
+    # ✅ 루트 기준 상대경로로 고정
+    train_dataset = CaptchaDataset("dataset/captcha_images_split/train")
+    val_dataset = CaptchaDataset("dataset/captcha_images_split/val")
 
-        # RNN expects input of shape (batch, sequence_len=W, features=128*H/4)
-        self.rnn = nn.LSTM(
-            input_size=128 * (imgH // 4),  # 128 * 12 = 1536
-            hidden_size=nh,
-            num_layers=2,
-            bidirectional=True,
-            batch_first=True
-        )
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_fn)
 
-        self.fc = nn.Linear(nh * 2, nclass)  # bidirectional => nh * 2
+    model = CRNN(50, 1, len(CHARS) + 1, 256).to(DEVICE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    def forward(self, x):
-        # x: (B, 1, H, W)
-        conv = self.cnn(x)  # -> (B, C, H', W')
-        b, c, h, w = conv.size()
+    best_val_loss = float("inf")
 
-        # ✅ 수정된 높이 체크
-        assert h == 12, f"Expected height=12 after conv, got {h}"
+    for epoch in range(EPOCHS):
+        model.train()
+        train_loss = 0.0
+        loop = tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS} [Train]")
 
-        # prepare for RNN: (B, W, C*H)
-        conv = conv.permute(0, 3, 1, 2)       # (B, W, C, H)
-        conv = conv.contiguous().view(b, w, c * h)  # (B, W, C*H)
+        for imgs, labels, label_lengths in loop:
+            imgs = imgs.to(DEVICE)
+            labels = labels.to(DEVICE)
+            label_lengths = label_lengths.to(DEVICE)
 
-        rnn_out, _ = self.rnn(conv)  # -> (B, W, nh*2)
-        output = self.fc(rnn_out)   # -> (B, W, nclass)
-        output = output.permute(1, 0, 2)  # -> (W, B, nclass) for CTC Loss
+            preds = model(imgs)
+            preds_log_softmax = preds.log_softmax(2)
+            preds_size = torch.IntTensor([preds.size(0)] * preds.size(1)).to(DEVICE)
 
-        return output
+            loss = criterion(preds_log_softmax, labels, preds_size, label_lengths)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item()
+            loop.set_postfix(loss=loss.item())
+
+        avg_train_loss = train_loss / len(train_loader)
+
+        # 검증
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            loop = tqdm(val_loader, desc=f"Epoch {epoch+1}/{EPOCHS} [Val]")
+            for imgs, labels, label_lengths in loop:
+                imgs = imgs.to(DEVICE)
+                labels = labels.to(DEVICE)
+                label_lengths = label_lengths.to(DEVICE)
+
+                preds = model(imgs)
+                preds_log_softmax = preds.log_softmax(2)
+                preds_size = torch.IntTensor([preds.size(0)] * preds.size(1)).to(DEVICE)
+
+                loss = criterion(preds_log_softmax, labels, preds_size, label_lengths)
+                val_loss += loss.item()
+                loop.set_postfix(val_loss=loss.item())
+
+        avg_val_loss = val_loss / len(val_loader)
+        print(f"[Epoch {epoch+1}] Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            torch.save(model.state_dict(), SAVE_PATH)
+            print(f"✅ Best model saved with val loss {best_val_loss:.4f}")
+
+if __name__ == "__main__":
+    train()

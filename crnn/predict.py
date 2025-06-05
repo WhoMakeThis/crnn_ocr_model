@@ -51,7 +51,7 @@ model.load_state_dict(torch.load("best_crnn_model.pth", map_location=DEVICE))
 model.eval()
 
 # 테스트 이미지
-test_dir = "../dataset/captcha_images_split/test"
+test_dir = "dataset/captcha_images_split/test"
 image_paths = sorted([
     os.path.join(test_dir, fname)
     for fname in os.listdir(test_dir)
